@@ -12,6 +12,8 @@
 ## Installation <a name="installation"></a>
 
 - SciKit-Learn
+- PyTorch
+- imblearn
 - Matplotlib
 - numpy
 - Pandas
