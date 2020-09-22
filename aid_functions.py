@@ -92,9 +92,12 @@ def impute_dataframe(df, imputer, numerical_cols=None):
     return df_imputed
 
 
-def ordinal_encode_df(df):
+def ordinal_encode_df(df, encoder=None):
     """ Transform the object categories by means of ordinal encoding"""
-    ordinal_enc = OrdinalEncoder().fit(df.select_dtypes('object').replace(np.nan, 'nan'))
+    if encoder is None:
+        ordinal_enc = OrdinalEncoder().fit(df.select_dtypes('object').replace(np.nan, 'nan'))
+    else:
+        ordinal_enc = encoder
     object_ordinals = pd.DataFrame(ordinal_enc.transform(df.select_dtypes('object').replace(np.nan, 'nan'))).astype(
         'int')
     # we put back in the nan values
@@ -105,23 +108,26 @@ def ordinal_encode_df(df):
         df[col] = object_ordinals.iloc[:, i]
 
 
-def get_scaled_df(df):
+def get_scaled_df(df, scaler=None):
     # generate list of columns not to be scaled
     # get columns which were turned into dummies i.e 0-1
     one_hot_list = [col for col in df.columns if df[col].max() <= 1]
-
-    scaler = StandardScaler(copy=False)
-    df_scaled = pd.DataFrame(scaler.fit_transform(df[df.columns.difference(one_hot_list)]))
+    if scaler is None:
+        scaler = StandardScaler(copy=False).fit(df[df.columns.difference(one_hot_list)])
+        
+    df_scaled = pd.DataFrame(scaler.transform(df[df.columns.difference(one_hot_list)]))
     df_scaled.columns = df[df.columns.difference(one_hot_list)].columns
     df_scaled = pd.concat([df_scaled, df[one_hot_list]], axis=1)
 
-    return df_scaled
+    return df_scaled, scaler
 
 
-def clean_df(df, imputer, cols_to_drop=None):
-    # drop unnecessary
+def clean_df(df, imputer, cols_to_drop=None, ordinal_encoder=None, add_feats=None):
+    """ Performs the preprocessing on the DataFrame, returns the clean DataFrame and the categorical ordinal encoder used for it."""
     if cols_to_drop is None:
         cols_to_drop = []
+    
+    # drop unnecessary
     df_clean = df.drop(["LNR", "EINGEFUEGT_AM"], axis=1, errors='ignore')
     
     # replace and remove unknown values
@@ -152,7 +158,9 @@ def clean_df(df, imputer, cols_to_drop=None):
     replace_values_in_df(df_clean, set_9, 9)
 
     # Ordinal encode categorical features
-    ordinal_encode_df(df_clean)
+    if ordinal_encoder is None:
+        ordinal_encoder = OrdinalEncoder().fit(df_clean.select_dtypes('object').replace(np.nan, 'nan'))
+    ordinal_encode_df(df_clean, ordinal_encoder)
 
     # Remove the passed in columns
     df_clean.drop(cols_to_drop, axis=1, inplace=True, errors='ignore')
@@ -183,8 +191,38 @@ def clean_df(df, imputer, cols_to_drop=None):
     
     # Get dummies for selected categorical features
     df_clean = pd.get_dummies(df_clean, columns=cat_features, drop_first=True)
+    if add_feats is not None:
+        df_clean = df_clean.reindex(columns=add_feats, fill_value=0)
     
     # Reduce memory usage
     df_clean = df_clean.apply(pd.to_numeric, downcast='unsigned', errors='ignore')
 
-    return df_clean
+    return df_clean, ordinal_encoder
+
+
+def show_result(model, X_train, y_train, X_test, y_test, y_pred):
+    print(classification_report(y_test, y_pred))
+    print(pd.DataFrame(y_pred).value_counts())
+    print("Validation AUC score is: " + str(roc_auc_score(y_test, y_pred)))
+    ax = plt.gca()
+    plot_roc_curve(model, X_train, y_train, ax=ax)
+    plot_roc_curve(model, X_test, y_test, ax=ax)
+
+
+def train_model(X, y, pipeline, params={}, test_size=0.3, n_jobs=10):
+    gridCV = GridSearchCV(pipeline,
+                          params,
+                          n_jobs=n_jobs,
+                          verbose=8,
+                          scoring='roc_auc',
+                          cv=2)
+    X_train, X_test, y_train, y_test = train_test_split(X,
+                                                        y,
+                                                        test_size=test_size,
+                                                        random_state=1)
+    gridCV.fit(X_train, y_train)
+    y_pred = gridCV.predict(X_test)
+
+    show_result(gridCV, X_train, y_train, X_test, y_test, y_pred)
+    print(gridCV.best_estimator_)
+    return gridCV
