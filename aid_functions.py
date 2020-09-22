@@ -79,9 +79,9 @@ def impute_dataframe(df, imputer, numerical_cols=None):
     if numerical_cols is None:
         numerical_cols = []
     if numerical_cols:
-        df_imputed = df[numerical_cols].copy()
+        df_imputed = df[numerical_cols]
     else:
-        df_imputed = df.select_dtypes('number').copy()
+        df_imputed = df.select_dtypes('number')
     df_imputed[:] = imputer.transform(df_imputed)
     try:
         df_categoricals = pd.get_dummies(df.select_dtypes('object'), drop_first=True)
@@ -108,10 +108,11 @@ def ordinal_encode_df(df):
 def get_scaled_df(df):
     # generate list of columns not to be scaled
     # get columns which were turned into dummies i.e 0-1
-    one_hot_list = [col for col in df.columns if df[col].max() == 1]
+    one_hot_list = [col for col in df.columns if df[col].max() <= 1]
 
     scaler = StandardScaler(copy=False)
-    df_scaled = scaler.fit_transform(df[df.columns.difference(one_hot_list)])
+    df_scaled = pd.DataFrame(scaler.fit_transform(df[df.columns.difference(one_hot_list)]))
+    df_scaled.columns = df[df.columns.difference(one_hot_list)].columns
     df_scaled = pd.concat([df_scaled, df[one_hot_list]], axis=1)
 
     return df_scaled
@@ -122,32 +123,47 @@ def clean_df(df, imputer, cols_to_drop=None):
     if cols_to_drop is None:
         cols_to_drop = []
     df_clean = df.drop(["LNR", "EINGEFUEGT_AM"], axis=1, errors='ignore')
-
+    
     # replace and remove unknown values
-    df_clean['CAMEO_DEUG_2015'] = df_clean['CAMEO_DEUG_2015'].replace('X', -1).astype('float16')
-    df_clean['CAMEO_INTL_2015'] = df_clean['CAMEO_INTL_2015'].replace('XX', -1).astype('float16')
-
+    try:
+        df_clean['CAMEO_DEUG_2015'] = df_clean['CAMEO_DEUG_2015'].replace('X', -1).astype('float16')
+    except:
+        pass
+    try:
+        df_clean['CAMEO_INTL_2015'] = df_clean['CAMEO_INTL_2015'].replace('XX', -1).astype('float16')
+    except:
+        pass
+        
     # reduce the memory usage
     df_clean = df_clean.astype('float16', errors='ignore')
 
     # replace with NaNs the unknown values
     set_0 = 'AGER_TYP, ALTERSKATEGORIE_GROB, ALTER_HH, ANREDE_KZ, CJT_GESAMTTYP, GEBAEUDETYP, GEOSCORE_KLS7, ' \
             'HAUSHALTSSTRUKTUR, HH_EINKOMMEN_SCORE, KBA05_*, KKK, NATIONALITAET_KZ, PRAEGENDE_JUGENDJAHRE, REGIOTYP, ' \
-            'RETOURTYP_BK_S, TITEL_KZ, WOHNDAUER_2008, WACHSTUMSGEBIET_NB, W_KEIT_KIND_HH'.split(
-        ', ')
+            'RETOURTYP_BK_S, TITEL_KZ, WOHNDAUER_2008, WACHSTUMSGEBIET_NB, W_KEIT_KIND_HH'.split(', ')
     set_neg1 = 'AGER_TYP, ALTERSKATEGORIE_GROB, ANREDE_KZ, BALLRAUM, BIP_FLAG, CAMEO_DEUG_2015, CAMEO_INTL_2015, ' \
                'D19_KK_KUNDENTYP, EWDICHTE, FINANZTYP, FINANZ_*, GEBAEUDETYP, GEOSCORE_KLS7, HAUSHALTSSTRUKTUR, ' \
                'HEALTH_TYP, HH_EINKOMMEN_SCORE, INNENSTADT, KBA05_*, KBA13_*, KKK, NATIONALITAET_KZ, ORTSGR_KLS9, ' \
                'OST_WEST_KZ, PLZ8_*, PRAEGENDE_JUGENDJAHRE, REGIOTYP, SEMIO_*, SHOPPER_TYP, SOHO_KZ, TITEL_KZ, ' \
-               'VERS_TYP, WOHNDAUER_2008, WOHNLAGE, WACHSTUMSGEBIET_NB, W_KEIT_KIND_HH, ZABEOTYP'.split(
-        ', ')
+               'VERS_TYP, WOHNDAUER_2008, WOHNLAGE, WACHSTUMSGEBIET_NB, W_KEIT_KIND_HH, ZABEOTYP'.split(', ')
     set_9 = 'KBA05_*, SEMIO_*, ZABEOTYP'.split(', ')
     replace_values_in_df(df_clean, set_0, 0)
     replace_values_in_df(df_clean, set_neg1, -1)
     replace_values_in_df(df_clean, set_9, 9)
 
-    # Select the categorical features for ordinal encoding (necessary for imputer)
-    D19_categories = [col for col in df.columns if (
+    # Ordinal encode categorical features
+    ordinal_encode_df(df_clean)
+
+    # Remove the passed in columns
+    df_clean.drop(cols_to_drop, axis=1, inplace=True, errors='ignore')
+
+    # Replace missing values
+    df_clean = impute_dataframe(df_clean, imputer)
+    df_clean[df_clean < 0] = 0
+    df_clean = df_clean.round().apply(pd.to_numeric, downcast='unsigned', errors='ignore')
+
+    # Select the categorical features for dummy creation
+    D19_categories = [col for col in df_clean.columns if (
             col.startswith('D19')
             and not (col.endswith('ANZ_12'))
             and not (col.endswith('ANZ_24'))
@@ -160,25 +176,15 @@ def clean_df(df, imputer, cols_to_drop=None):
                    'LP_LEBENSPHASE_FEIN, LP_LEBENSPHASE_GROB, LP_STATUS_FEIN, LP_STATUS_GROB, NATIONALITAET_KZ, ' \
                    'OST_WEST_KZ, PRAEGENDE_JUGENDJAHRE, REGIOTYP, RETOURTYP_BK_S, SHOPPER_TYP, SOHO_KZ, TITEL_KZ, ' \
                    'VERS_TYP, WOHNLAGE, ZABEOTYP, UNGLEICHENN_FLAG, DSL_FLAG, HH_DELTA_FLAG, KBA05_SEG6, ' \
-                   'KONSUMZELLE'.split(
-        ', ')
-    cat_features = [cat for cat in cat_features if cat in df.columns]
+                   'KONSUMZELLE'.split(', ')
     for cat in D19_categories:
         cat_features.append(cat)
-
-    # Ordinal encode categorical features
-    ordinal_encode_df(df_clean)
-
-    # Remove the passed in columns
-    df_clean.drop(cols_to_drop, axis=1, inplace=True, errors='ignore')
-
-    # Replace missing values
-    df_clean = impute_dataframe(df_clean, imputer)
-
-    # Reduce memory usage
-    df_clean = df_clean.round().apply(pd.to_numeric, downcast='unsigned', errors='ignore')
-
+    cat_features = [cat for cat in cat_features if cat in df_clean.columns]
+    
     # Get dummies for selected categorical features
     df_clean = pd.get_dummies(df_clean, columns=cat_features, drop_first=True)
+    
+    # Reduce memory usage
+    df_clean = df_clean.apply(pd.to_numeric, downcast='unsigned', errors='ignore')
 
     return df_clean
