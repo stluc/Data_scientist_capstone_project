@@ -17,6 +17,8 @@
 - Matplotlib
 - numpy
 - Pandas
+- hvPlot
+- PyTorch
 - Jupyter Notebook
 - The code should run with no issues using Python versions 3.* (Python 3.8 was used).
 
@@ -32,7 +34,8 @@ Due to privacy agreement the dataset used is not made available as well as all t
 
 ## Results<a name="results"></a>
 
-The main findings of the code can be found at the post available [here](https://medium.com/@iamjuststen/-).
+The main findings of the code can be found at the post available [here](https://medium.com/@iamjuststen/customer-prediction-in-imbalanced-dataset-the-arvato-case-513822cdbbfe).
+The model scored 0.7399 (AUC) in the [Kaggle competition](http://www.kaggle.com/t/21e6d45d4c574c7fa2d868f0e8c83140), but there are still high margins for improval.
 
 ## Licensing, Authors, Acknowledgements<a name="licensing"></a>
 
