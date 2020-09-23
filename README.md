@@ -19,6 +19,7 @@
 - Pandas
 - hvPlot
 - PyTorch
+- Sweetviz
 - Jupyter Notebook
 - The code should run with no issues using Python versions 3.* (Python 3.8 was used).
 
@@ -30,8 +31,8 @@ The data provided was heavily imbalanced and a lot of data from the features was
 ## File Descriptions <a name="files"></a>
 
 The full analysis is contained in the jupyter notebook. Most of the functions are written in a separate file that needs to be imported named 'aid_functions.py'.
+A Sweetviz report is attached, but the code was later removed from the notebook. It was only used once to get a quick overview of the data and to get some insight.
 Due to privacy agreement the dataset used is not made available as well as all the models and data interpretation sheets.
-
 
 ## Results<a name="results"></a>
 
