@@ -23,12 +23,13 @@
 - The code should run with no issues using Python versions 3.* (Python 3.8 was used).
 
 ## Project Motivation<a name="motivation"></a>
+The task is to correctly predict new possible customers for a mail handout marketing campaign for the company Arvato, which offers products by mail order. This mostly comes up to a binary classification problem.
 
 The data provided was heavily imbalanced and a lot of data from the features was missing. The project assigned as capstone project by Udacity was a good exercise to handle data which must be interpreted and sorted out as well as understanding the issues regarding machine learning models during data science process.
 
 ## File Descriptions <a name="files"></a>
 
-The full analysis is contained in the jupyter notebook. Most of the functions are written in a separate file that needs to be imported named 'AidFunctions.py'.
+The full analysis is contained in the jupyter notebook. Most of the functions are written in a separate file that needs to be imported named 'aid_functions.py'.
 Due to privacy agreement the dataset used is not made available as well as all the models and data interpretation sheets.
 
 
